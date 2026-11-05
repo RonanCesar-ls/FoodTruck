@@ -1,0 +1,25 @@
+node_modules/
+dist/
+coverage/
+*.tsbuildinfo
+*.log
+
+# Bancos locais e arquivos auxiliares do SQLite.
+*.db
+*.db-*
+*.sqlite
+*.sqlite-*
+*.sqlite3
+*.sqlite3-*
+
+# Configurações locais e segredos.
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# Arquivos locais de ferramentas e do sistema operacional.
+.DS_Store
+Thumbs.db
+.idea/
