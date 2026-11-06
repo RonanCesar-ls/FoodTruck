@@ -11,7 +11,7 @@
     "dev": "tsx watch src/server.ts",
     "typecheck": "tsc --noEmit",
     "build": "tsc",
-    "test": "npm run build && node --test tests/persistence.test.mjs",
+    "test": "npm run build && node --test tests/persistence.test.mjs tests/services.test.mjs tests/http.test.mjs",
     "start": "node dist/server.js"
   },
   "dependencies": {

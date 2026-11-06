@@ -170,10 +170,10 @@ test("servidor compilado inicializa SQLite temporário antes de atender HTTP", a
     } finally {
       database.close();
     }
-    for (const [method, route] of [["POST", "/api/itens"], ["GET", "/api/cardapio"], ["GET", "/api/categorias"], ["GET", "/api/qrcode"]]) {
+    for (const [method, route, status] of [["POST", "/api/itens", 400], ["GET", "/api/cardapio", 200], ["GET", "/api/categorias", 200], ["GET", "/api/qrcode", 404]]) {
       const response = await fetch(`http://127.0.0.1:${port}${route}`, { method });
       await response.text();
-      assert.equal(response.status, 404, `${method} ${route}`);
+      assert.equal(response.status, status, `${method} ${route}`);
     }
   } finally {
     clearTimeout(timer);

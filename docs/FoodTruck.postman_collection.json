@@ -1,0 +1,109 @@
+{
+  "info": {
+    "name": "FoodTruck — etapa 4",
+    "description": "Inicie o servidor e ajuste baseUrl. Em um SQLite novo, o primeiro cardápio estará vazio. Os três cadastros retornam 201; os casos inválidos retornam 400 com {erro} e não inserem itens. Os IDs não são fixos. QR Code ainda não está disponível.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:8080", "type": "string" }
+  ],
+  "item": [
+    {
+      "name": "200 — Categorias iniciais",
+      "request": { "method": "GET", "url": "{{baseUrl}}/api/categorias" }
+    },
+    {
+      "name": "200 — Cardápio inicial (vazio em banco novo)",
+      "request": { "method": "GET", "url": "{{baseUrl}}/api/cardapio" }
+    },
+    {
+      "name": "201 — Cadastro de 0.29 reais",
+      "request": {
+        "method": "POST",
+        "url": "{{baseUrl}}/api/itens",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": { "mode": "raw", "raw": "{\n  \"categoria\": \"Bebidas\",\n  \"nome\": \"Zumo\",\n  \"descricao\": \"Copo pequeno\",\n  \"valor\": 0.29\n}", "options": { "raw": { "language": "json" } } }
+      }
+    },
+    {
+      "name": "201 — Valor zero e descrição omitida",
+      "request": {
+        "method": "POST",
+        "url": "{{baseUrl}}/api/itens",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": { "mode": "raw", "raw": "{\n  \"categoria\": \"Bebidas\",\n  \"nome\": \"Água\",\n  \"valor\": 0\n}", "options": { "raw": { "language": "json" } } }
+      }
+    },
+    {
+      "name": "201 — Mais um item fora da ordem alfabética",
+      "request": {
+        "method": "POST",
+        "url": "{{baseUrl}}/api/itens",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": { "mode": "raw", "raw": "{\n  \"categoria\": \"Sobremesas\",\n  \"nome\": \"Banana\",\n  \"descricao\": null,\n  \"valor\": 8.9\n}", "options": { "raw": { "language": "json" } } }
+      }
+    },
+    {
+      "name": "200 — Cardápio ordenado por nome",
+      "request": { "method": "GET", "url": "{{baseUrl}}/api/cardapio" }
+    },
+    {
+      "name": "400 — Categoria inexistente",
+      "request": {
+        "method": "POST",
+        "url": "{{baseUrl}}/api/itens",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": { "mode": "raw", "raw": "{\"categoria\":\"Inexistente\",\"nome\":\"Inválido\",\"valor\":8.9}", "options": { "raw": { "language": "json" } } }
+      }
+    },
+    {
+      "name": "400 — Nome em branco",
+      "request": {
+        "method": "POST",
+        "url": "{{baseUrl}}/api/itens",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": { "mode": "raw", "raw": "{\"categoria\":\"Bebidas\",\"nome\":\"   \",\"valor\":8.9}", "options": { "raw": { "language": "json" } } }
+      }
+    },
+    {
+      "name": "400 — Valor negativo",
+      "request": {
+        "method": "POST",
+        "url": "{{baseUrl}}/api/itens",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": { "mode": "raw", "raw": "{\"categoria\":\"Bebidas\",\"nome\":\"Inválido\",\"valor\":-1}", "options": { "raw": { "language": "json" } } }
+      }
+    },
+    {
+      "name": "400 — Valor textual",
+      "request": {
+        "method": "POST",
+        "url": "{{baseUrl}}/api/itens",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": { "mode": "raw", "raw": "{\"categoria\":\"Bebidas\",\"nome\":\"Inválido\",\"valor\":\"8,90\"}", "options": { "raw": { "language": "json" } } }
+      }
+    },
+    {
+      "name": "400 — Mais de duas casas decimais",
+      "request": {
+        "method": "POST",
+        "url": "{{baseUrl}}/api/itens",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": { "mode": "raw", "raw": "{\"categoria\":\"Bebidas\",\"nome\":\"Inválido\",\"valor\":8.901}", "options": { "raw": { "language": "json" } } }
+      }
+    },
+    {
+      "name": "400 — JSON malformado (não corrigir o corpo deste exemplo)",
+      "request": {
+        "method": "POST",
+        "url": "{{baseUrl}}/api/itens",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": { "mode": "raw", "raw": "{\"categoria\":\"Bebidas\",\"nome\":\"Inválido\",\"valor\":0.29", "options": { "raw": { "language": "json" } } }
+      }
+    },
+    {
+      "name": "200 — Confirmar que os erros não inseriram itens",
+      "request": { "method": "GET", "url": "{{baseUrl}}/api/cardapio" }
+    }
+  ]
+}

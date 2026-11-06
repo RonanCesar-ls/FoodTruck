@@ -1,14 +1,19 @@
-# Contrato planejado da API FoodTruck
+# API FoodTruck
 
-**Status: endpoints futuros, ainda não implementados.** Esta documentação permite
-ao frontend trabalhar com mocks. Até a etapa 2, as quatro rotas abaixo retornam 404
-por não estarem registradas. A persistência SQLite e as categorias iniciais já são
-inicializadas pelo servidor, mas ainda não estão expostas por HTTP.
+**Status da etapa 4:** cadastro de itens, consulta de cardápio e categorias estão
+disponíveis. O QR Code continua planejado e sua rota ainda retorna 404.
+
+| Método e rota | Status |
+| --- | --- |
+| `POST /api/itens` | Disponível — cadastro com Builder e persistência SQLite |
+| `GET /api/cardapio` | Disponível — ordenação por nome usando Strategy |
+| `GET /api/categorias` | Disponível — categorias do SQLite |
+| `GET /api/qrcode` | Planejado — ainda não implementado |
 
 O frontend consumirá HTTP/JSON na mesma origem do servidor. Exemplos locais usam
 `http://localhost:8080`; a porta pode ser alterada por `PORT`.
-Entradas e respostas JSON usarão `Content-Type: application/json`. A resposta do
-QR Code será binária, com `Content-Type: image/png`.
+Envie os cadastros com `Content-Type: application/json`. As três rotas disponíveis
+retornam JSON. A futura resposta do QR Code será binária, com `Content-Type: image/png`.
 
 ## Regras compartilhadas dos itens
 
@@ -18,19 +23,23 @@ QR Code será binária, com `Content-Type: image/png`.
 | `categoria` | Texto com o nome da categoria, nunca um objeto. Categorias iniciais: `Bebidas`, `Pratos` e `Sobremesas`. |
 | `nome` | Texto com o nome do item. |
 | `descricao` | Texto ou `null`. Opcional no cadastro; quando ausente, será normalizada para `null` nas respostas. |
-| `valor` | Número em reais, maior ou igual a zero. Nunca uma string como `"8,00"`. |
+| `valor` | Número finito em reais, maior ou igual a zero, com até duas casas decimais e conversível em centavos inteiros seguros. Nunca uma string como `"8,00"`. |
 
 `valorCentavos` é exclusivamente interno e nunca aparece no JSON. A conversão
-entre reais e centavos inteiros será implementada posteriormente. O identificador
+entre reais e centavos inteiros ocorre na fronteira HTTP. O identificador
 interno de um item novo será zero até sua persistência.
 
 JSON usa ponto como separador decimal: `8.00` e `8` representam o mesmo número.
 O frontend pode formatar a exibição como moeda brasileira. **Valor zero é permitido;
 valores negativos são inválidos.**
 
-## POST /api/itens — planejado
+O valor não é arredondado para caber em centavos: `8.901` é rejeitado. Valores como
+`0.29`, `1.15` e `8.90` são aceitos e persistidos como 29, 115 e 890 centavos.
+O total em centavos não pode ultrapassar `Number.MAX_SAFE_INTEGER`.
 
-Cadastrará um item. Exemplo de corpo:
+## POST /api/itens — disponível
+
+Cadastra um item. Exemplo de corpo:
 
 ```json
 {
@@ -88,17 +97,30 @@ Exemplo para `valor: "8,00"`:
 
 ```json
 {
-  "erro": "O valor deve ser um número em reais."
+  "erro": "O valor deve ser um número finito em reais."
 }
 ```
 
-As mensagens acima são exemplos para mocks; o frontend deve apresentar o texto de
-`erro`, sem depender de uma mensagem literal específica.
+Também retornam 400: categoria inexistente, nome em branco, campos com tipos
+incorretos, descrição diferente de texto/null, corpo que não seja objeto JSON,
+mais de duas casas decimais e valores que excedam o limite de centavos seguros.
+Esses pedidos não inserem itens.
 
-## GET /api/cardapio — planejado
+JSON malformado retorna **HTTP 400**:
+
+```json
+{ "erro": "JSON malformado." }
+```
+
+O frontend deve apresentar o texto de `erro`, sem depender de uma mensagem literal
+específica. O nome do item e o nome da categoria têm os espaços externos removidos;
+o nome do item não pode ficar vazio. A descrição fornecida é preservada.
+
+## GET /api/cardapio — disponível
 
 Sucesso: **HTTP 200**, array de itens no mesmo formato das respostas de cadastro,
-com `id`. O backend aplicará **ordenação padrão por nome**. Exemplo:
+com `id`. O backend aplica **ordenação crescente por nome em português**, sem
+distinguir maiúsculas de minúsculas. Exemplo:
 
 ```json
 [
@@ -126,10 +148,11 @@ Quando não houver itens, **HTTP 200** com:
 ```
 
 Não há parâmetros de busca, filtros ou ordenação neste contrato. As estratégias
-internas por nome ou valor serão implementadas em outra etapa e deverão devolver
-uma nova lista, sem modificar a lista recebida.
+internas por nome ou valor já estão implementadas e devolvem uma nova lista, sem
+modificar a lista recebida. A API usa `OrdenacaoPorNome` como padrão, sem expor um
+parâmetro de ordenação.
 
-## GET /api/categorias — planejado
+## GET /api/categorias — disponível
 
 Sucesso: **HTTP 200**:
 
@@ -144,6 +167,43 @@ Sucesso: **HTTP 200**:
 Os IDs são ilustrativos; o frontend deve usar os valores retornados pela API,
 sem fixá-los no código. No cadastro de item, enviar o **nome** da categoria no
 campo `categoria`, e não seu ID nem o objeto retornado por esta rota.
+
+## Erros inesperados
+
+Nas três rotas disponíveis, falhas inesperadas de infraestrutura retornam
+**HTTP 500** com mensagem genérica, sem SQL, caminhos locais ou stack trace:
+
+```json
+{ "erro": "Erro interno do servidor." }
+```
+
+## Repetir no Postman
+
+Importe [FoodTruck.postman_collection.json](FoodTruck.postman_collection.json) e
+ajuste a variável de coleção `baseUrl` (padrão `http://localhost:8080`). O servidor
+precisa estar em execução. Para conferir o cardápio inicialmente vazio, escolha
+um arquivo SQLite novo com `DATABASE_PATH` antes de iniciar o servidor.
+
+A coleção inclui as três rotas, cadastros de `0.29` e zero sem descrição, itens
+fora de ordem e seis exemplos de erro 400, incluindo JSON malformado.
+Nos cadastros, use **Body → raw → JSON**. Por exemplo:
+
+```http
+POST {{baseUrl}}/api/itens
+Content-Type: application/json
+
+{"categoria":"Bebidas","nome":"Zumo","valor":0.29}
+```
+
+```http
+POST {{baseUrl}}/api/itens
+Content-Type: application/json
+
+{"categoria":"Bebidas","nome":"Água","valor":0}
+```
+
+Consulte `GET {{baseUrl}}/api/categorias` e `GET {{baseUrl}}/api/cardapio`.
+Compare o cardápio antes e depois dos casos inválidos: nenhum deles deve criar itens.
 
 ## GET /api/qrcode — planejado
 
