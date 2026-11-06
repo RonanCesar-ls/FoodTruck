@@ -105,13 +105,18 @@ test("DATABASE_PATH resolve a mesma raiz em src e dist, fora do diretório do pr
   const env = { ...process.env };
   delete env.DATABASE_PATH;
   delete env.PORT;
+  delete env.CARDAPIO_URL;
   const configSource = (location) => `
     const { config } = await import(${JSON.stringify(new URL(location, import.meta.url).href)});
     process.stdout.write(JSON.stringify(config));
   `;
   const compiled = configSource("../dist/config/env.js");
   const development = configSource("../src/config/env.ts");
-  const expected = { port: 8080, databasePath: join(projectRoot, "data", "foodtruck.sqlite") };
+  const expected = {
+    port: 8080,
+    databasePath: join(projectRoot, "data", "foodtruck.sqlite"),
+    cardapioUrl: "http://localhost:8080/cardapio.html",
+  };
   assert.deepEqual(JSON.parse(runModule(compiled, { env })), expected);
   assert.deepEqual(JSON.parse(runModule(development, {
     env,
@@ -170,7 +175,7 @@ test("servidor compilado inicializa SQLite temporário antes de atender HTTP", a
     } finally {
       database.close();
     }
-    for (const [method, route, status] of [["POST", "/api/itens", 400], ["GET", "/api/cardapio", 200], ["GET", "/api/categorias", 200], ["GET", "/api/qrcode", 404]]) {
+    for (const [method, route, status] of [["POST", "/api/itens", 400], ["GET", "/api/cardapio", 200], ["GET", "/api/categorias", 200], ["GET", "/api/qrcode", 200]]) {
       const response = await fetch(`http://127.0.0.1:${port}${route}`, { method });
       await response.text();
       assert.equal(response.status, status, `${method} ${route}`);

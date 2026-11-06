@@ -157,10 +157,12 @@ test("HTTP real com servidor compilado e SQLite temporário", async (t) => {
     assert.deepEqual((await request("/api/cardapio")).body, ordenados());
   });
 
-  await t.test("QR Code permanece sem rota implementada", async () => {
+  await t.test("QR Code retorna PNG binário", async () => {
     const response = await fetch(baseUrl + "/api/qrcode");
-    await response.text();
-    assert.equal(response.status, 404);
+    assert.equal(response.status, 200);
+    assert.equal(response.headers.get("content-type"), "image/png");
+    const image = Buffer.from(await response.arrayBuffer());
+    assert.deepEqual(image.subarray(0, 8), Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]));
   });
 
   await t.test("falhas reais de infraestrutura retornam 500 genérico", async () => {

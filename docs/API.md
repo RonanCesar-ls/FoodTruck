@@ -1,19 +1,19 @@
 # API FoodTruck
 
-**Status da etapa 4:** cadastro de itens, consulta de cardápio e categorias estão
-disponíveis. O QR Code continua planejado e sua rota ainda retorna 404.
+**Status final do backend:** as quatro rotas abaixo estão disponíveis. As telas
+não estão neste checkout; veja [o guia de integração](INTEGRACAO_FRONTEND.md).
 
 | Método e rota | Status |
 | --- | --- |
 | `POST /api/itens` | Disponível — cadastro com Builder e persistência SQLite |
 | `GET /api/cardapio` | Disponível — ordenação por nome usando Strategy |
 | `GET /api/categorias` | Disponível — categorias do SQLite |
-| `GET /api/qrcode` | Planejado — ainda não implementado |
+| `GET /api/qrcode` | Disponível — PNG binário com o destino configurado |
 
 O frontend consumirá HTTP/JSON na mesma origem do servidor. Exemplos locais usam
 `http://localhost:8080`; a porta pode ser alterada por `PORT`.
-Envie os cadastros com `Content-Type: application/json`. As três rotas disponíveis
-retornam JSON. A futura resposta do QR Code será binária, com `Content-Type: image/png`.
+Envie os cadastros com `Content-Type: application/json`. As três primeiras rotas
+retornam JSON. O QR Code retorna bytes com `Content-Type: image/png`.
 
 ## Regras compartilhadas dos itens
 
@@ -170,7 +170,7 @@ campo `categoria`, e não seu ID nem o objeto retornado por esta rota.
 
 ## Erros inesperados
 
-Nas três rotas disponíveis, falhas inesperadas de infraestrutura retornam
+Nas quatro rotas, falhas inesperadas de infraestrutura ou geração de imagem retornam
 **HTTP 500** com mensagem genérica, sem SQL, caminhos locais ou stack trace:
 
 ```json
@@ -184,7 +184,7 @@ ajuste a variável de coleção `baseUrl` (padrão `http://localhost:8080`). O s
 precisa estar em execução. Para conferir o cardápio inicialmente vazio, escolha
 um arquivo SQLite novo com `DATABASE_PATH` antes de iniciar o servidor.
 
-A coleção inclui as três rotas, cadastros de `0.29` e zero sem descrição, itens
+A coleção inclui as quatro rotas, cadastros de `0.29` e zero sem descrição, itens
 fora de ordem e seis exemplos de erro 400, incluindo JSON malformado.
 Nos cadastros, use **Body → raw → JSON**. Por exemplo:
 
@@ -205,20 +205,29 @@ Content-Type: application/json
 Consulte `GET {{baseUrl}}/api/categorias` e `GET {{baseUrl}}/api/cardapio`.
 Compare o cardápio antes e depois dos casos inválidos: nenhum deles deve criar itens.
 
-## GET /api/qrcode — planejado
+## GET /api/qrcode — disponível
 
 Sucesso: **HTTP 200**, com `Content-Type: image/png` e bytes da imagem PNG no corpo.
-Não haverá envelope JSON, string base64 ou objeto com URL na resposta.
+Não há envelope JSON, string base64 ou objeto com URL na resposta.
 
-O QR Code apontará para a **URL configurada da página do cardápio**, não para uma
-rota JSON da API. A configuração dessa URL e a geração da imagem serão feitas em
-etapas futuras. Por exemplo, em um mock, o QR poderá codificar
-`https://foodtruck.example/cardapio.html` (endereço apenas ilustrativo).
+O QR Code aponta para **`CARDAPIO_URL`**, a URL absoluta HTTP/HTTPS da página pública,
+validada na inicialização. O padrão é `http://localhost:<PORT>/cardapio.html`; o
+destino não é derivado do cabeçalho `Host` da requisição nem aponta para a rota JSON.
+Para o celular na mesma rede, configure, por exemplo,
+`CARDAPIO_URL=http://192.168.1.10:8080/cardapio.html`, substituindo o IP pelo do computador.
+O valor é normalizado por `URL` antes de ser codificado.
 
-O frontend poderá referenciar `/api/qrcode` no `src` de uma imagem. Para mocks,
-deve fornecer um arquivo PNG de exemplo com o mesmo tipo de conteúdo.
-Embora os geradores PNG e SVG estejam previstos no Factory Method futuro, este
-endpoint planeja somente a resposta PNG, sem parâmetro de formato.
+O frontend pode referenciar `/api/qrcode` no `src` de uma imagem ou abrir essa rota
+no navegador. No Postman, envie `GET {{baseUrl}}/api/qrcode` e visualize ou salve a
+resposta como PNG. A imagem é criada pelo fluxo `QrCodeService` → `PngQrCodeCreator`
+→ método fábrica → `PngQrCodeGenerator`. O criador SVG está implementado e testado,
+mas não é exposto como outra rota ou parâmetro de formato.
+
+**A página pública ainda não está no checkout.** Quando for entregue, coloque-a em
+`public/cardapio.html` ou ajuste `CARDAPIO_URL` ao endereço real. Até isso acontecer,
+a API gera o PNG corretamente, mas o endereço padrão da página retorna 404.
+O destino foi validado por decodificação e por um consumidor HTML temporário, sem
+afirmar teste visual ou em celular físico. O passo a passo de rede está no README.
 
 ## Escopo
 

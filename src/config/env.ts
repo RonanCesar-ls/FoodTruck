@@ -15,7 +15,19 @@ if (rawDatabasePath.trim() === "") {
   throw new Error("DATABASE_PATH não pode ser vazio.");
 }
 
+const rawCardapioUrl = process.env.CARDAPIO_URL ?? `http://localhost:${port}/cardapio.html`;
+let cardapioUrl: URL;
+try {
+  cardapioUrl = new URL(rawCardapioUrl);
+} catch {
+  throw new Error("CARDAPIO_URL deve ser uma URL absoluta com protocolo http ou https.");
+}
+if (!["http:", "https:"].includes(cardapioUrl.protocol)) {
+  throw new Error("CARDAPIO_URL deve usar o protocolo http ou https.");
+}
+
 export const config = {
   port,
   databasePath: resolve(projectRoot, rawDatabasePath),
+  cardapioUrl: cardapioUrl.href,
 };

@@ -1,7 +1,7 @@
 {
   "info": {
-    "name": "FoodTruck — etapa 4",
-    "description": "Inicie o servidor e ajuste baseUrl. Em um SQLite novo, o primeiro cardápio estará vazio. Os três cadastros retornam 201; os casos inválidos retornam 400 com {erro} e não inserem itens. Os IDs não são fixos. QR Code ainda não está disponível.",
+    "name": "FoodTruck — API completa",
+    "description": "Inicie o servidor e ajuste baseUrl. Em um SQLite novo, o primeiro cardápio estará vazio. Os três cadastros retornam 201; os casos inválidos retornam 400 com {erro} e não inserem itens. Os IDs não são fixos. GET /api/qrcode retorna PNG binário com CARDAPIO_URL; a página pública precisa ser fornecida pelo frontend.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
@@ -104,6 +104,14 @@
     {
       "name": "200 — Confirmar que os erros não inseriram itens",
       "request": { "method": "GET", "url": "{{baseUrl}}/api/cardapio" }
+    },
+    {
+      "name": "200 — QR Code PNG da página pública",
+      "request": {
+        "method": "GET",
+        "url": "{{baseUrl}}/api/qrcode",
+        "description": "Resposta binária image/png. Visualize ou salve como PNG. Ao ler o QR, o destino deve ser CARDAPIO_URL configurada no servidor. Não tente interpretar esta resposta como JSON."
+      }
     }
   ]
 }

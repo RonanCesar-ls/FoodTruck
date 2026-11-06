@@ -1,10 +1,11 @@
 # FoodTruck — backend
 
-Sistema acadêmico de cardápio via QR Code. Esta entrega cobre as etapas 1 a 4:
+Sistema acadêmico de cardápio via QR Code. Backend concluído, com quatro rotas:
 estrutura inicial, models, persistência SQLite, Singleton, repositories síncronos,
-Builder, estratégias de ordenação, services, controllers e [API HTTP](docs/API.md).
-Cadastro, cardápio e categorias estão disponíveis; QR Code e integração com telas
-ficam para as próximas etapas.
+Builder, estratégias de ordenação, Factory Method, services, controllers e [API HTTP](docs/API.md).
+Cadastro, cardápio, categorias e QR Code PNG estão disponíveis. **As telas ainda
+não foram fornecidas:** `public/` contém apenas `.gitkeep`. A integração externa
+está descrita em [docs/INTEGRACAO_FRONTEND.md](docs/INTEGRACAO_FRONTEND.md).
 
 ## Pré-requisitos
 
@@ -30,7 +31,7 @@ npm run dev
 | `npm run dev` | Executa TypeScript com `tsx watch`, reiniciando após alterações. |
 | `npm run typecheck` | Verifica os tipos sem gerar arquivos. |
 | `npm run build` | Compila `src/` para `dist/` usando `tsc`. |
-| `npm test` | Compila e executa testes dos services, padrões e integração SQLite/HTTP real com bancos temporários. |
+| `npm test` | Compila e testa services, padrões, SQLite/HTTP, reinício do servidor e decodificação de QR PNG/SVG. |
 | `npm start` | Executa `dist/server.js`; requer build prévio. |
 
 Para executar o build:
@@ -52,16 +53,43 @@ No shell POSIX: `PORT=8081 npm start`. `PORT` deve ser um inteiro de 1 a 65535.
 A configuração lê o ambiente do processo; não há carregamento de arquivo `.env`.
 Encerre o servidor com `Ctrl+C`.
 
+### Variáveis de ambiente
+
+| Variável | Padrão | Regra |
+| --- | --- | --- |
+| `PORT` | `8080` | Inteiro de 1 a 65535. |
+| `DATABASE_PATH` | `data/foodtruck.sqlite` | Arquivo SQLite; caminhos relativos à raiz do projeto. |
+| `CARDAPIO_URL` | `http://localhost:<PORT>/cardapio.html` | URL absoluta HTTP/HTTPS da página pública; validada antes de abrir o banco e a porta. |
+
+O destino do QR é a URL configurada, normalizada por `URL`, nunca o cabeçalho
+`Host` recebido. Se `PORT` mudar e `CARDAPIO_URL` estiver ausente, o padrão acompanha
+a nova porta. Ao definir `CARDAPIO_URL` explicitamente, mantenha a porta e o caminho
+coerentes com a página real. **A página `public/cardapio.html` ainda deve ser entregue
+pelo frontend; o QR não cria uma tela e o destino padrão retornará 404 até lá.**
+
+[.env.example](.env.example) contém um exemplo. Para usar um arquivo de ambiente
+com o suporte nativo do Node.js, sem instalar `dotenv`:
+
+```powershell
+Copy-Item .env.example .env
+# Edite .env com a porta, o banco e a URL pública desejados.
+npm run build
+node --env-file=.env dist/server.js
+```
+
+`npm start` e `npm run dev` continuam lendo somente o ambiente do processo.
+Não sobrescreva um `.env` já existente ao copiar o exemplo.
+
 `src/app.ts` exporta `createApp(services)`, que configura JSON, rotas, arquivos
 estáticos e tratamento de erros sem abrir porta nem inicializar o banco.
 `src/server.ts` inicializa o Singleton SQLite e monta os repositories, services e
-`OrdenacaoPorNome` antes de criar a aplicação e iniciar a escuta. Uma falha no banco
+`OrdenacaoPorNome` e o criador PNG antes de criar a aplicação e iniciar a escuta. Uma falha no banco
 impede a abertura da porta. O caminho de `public/` é resolvido a partir da
 localização do módulo, funcionando em desenvolvimento e no build mesmo se o
 processo for iniciado em outro diretório. `public/` ainda não contém frontend.
 
 `GET /api/cardapio` retorna **200**, com `[]` quando não há itens.
-`GET /api/qrcode` continua retornando **404**, pois ainda não foi implementado.
+`GET /api/qrcode` retorna **200**, com bytes PNG e `Content-Type: image/png`.
 
 ## API HTTP e Postman
 
@@ -70,10 +98,11 @@ processo for iniciado em outro diretório. `public/` ainda não contém frontend
 | `POST /api/itens` | 201 — item persistido com ID gerado |
 | `GET /api/cardapio` | 200 — array de itens ordenado por nome |
 | `GET /api/categorias` | 200 — array de `{ id, nome }` |
+| `GET /api/qrcode` | 200 — imagem PNG com a URL pública do cardápio |
 
 Importe [a coleção do Postman](docs/FoodTruck.postman_collection.json), configure
 `baseUrl` como `http://localhost:8080` e execute as requisições com o servidor ligado.
-Ela contém consultas, cadastros e erros 400. Para iniciar um banco vazio sem afetar
+Ela contém as quatro rotas, cadastros e erros 400. Para iniciar um banco vazio sem afetar
 seus dados, use um novo caminho em `DATABASE_PATH` antes de iniciar o servidor.
 Os exemplos completos e o formato das respostas estão em [docs/API.md](docs/API.md).
 
@@ -138,7 +167,7 @@ construído com `id` zero até a persistência.
 
 `ValidationError`, em `src/errors/`, identifica dados inválidos por `instanceof`.
 Falhas dos repositories são propagadas sem conversão para esse erro, permitindo
-que a futura camada HTTP distinga falhas de persistência de erros de validação.
+que a camada HTTP distinga falhas de persistência de erros de validação.
 
 Os services recebem as interfaces dos repositories pelo construtor, sem depender
 das classes SQLite:
@@ -165,11 +194,60 @@ e retorna o resultado de `salvar()`, já com o ID atribuído pelo repository.
 maiúsculas e minúsculas. `OrdenacaoPorValor` compara os centavos em ordem crescente.
 Ambas retornam uma nova lista e preservam a ordem da lista de entrada; empates
 mantêm a ordem relativa original. Para trocar a ordenação, injete outra estratégia
-no `CardapioService`. A futura montagem da API usará `OrdenacaoPorNome` como padrão.
+no `CardapioService`. A API usa `OrdenacaoPorNome` como padrão; a estratégia por
+valor permanece disponível e testada, sem adicionar filtros ou parâmetros à API.
 
 Os services continuam trabalhando exclusivamente com centavos inteiros. Controllers
 adaptam HTTP aos services, e DTOs validam a entrada e mapeiam a saída. A conversão
 monetária não interfere nos contratos síncronos da camada de domínio/persistência.
+
+## Padrões GoF no fluxo real
+
+| Padrão | Implementação e participação |
+| --- | --- |
+| Singleton | `DatabaseConnectionManager.getInstance()` fornece a conexão compartilhada aos repositories SQLite. |
+| Builder | `ItemCardapioService.cadastrar()` usa `ItemCardapioBuilder.build()` antes de persistir. |
+| Strategy | `CardapioService.listarCardapio()` delega à estratégia injetada; a API usa `OrdenacaoPorNome`. |
+| Factory Method | `QrCodeCreator.generate()` chama o método fábrica `createGenerator()`; `PngQrCodeCreator` cria o gerador usado em `GET /api/qrcode`. `SvgQrCodeCreator` cria o gerador SVG, verificado pelos testes. |
+
+Os geradores implementam `QrCodeGenerator` e usam a biblioteca `qrcode`. O service
+recebe o criador e `CARDAPIO_URL`; o controller retorna a imagem. SVG é uma opção
+interna de criação, sem uma quinta rota nem parâmetro de formato no HTTP.
+`sharp` e `jsqr` são dependências somente de teste: rasterizam as duas imagens e
+decodificam o conteúdo com um leitor independente.
+
+## Demonstração na mesma rede pelo celular
+
+1. Receba as telas da outra pessoa e coloque a página pública em
+   `public/cardapio.html`, ou ajuste `CARDAPIO_URL` ao endereço real do frontend.
+   Conecte as três telas conforme [o guia de integração](docs/INTEGRACAO_FRONTEND.md).
+2. Conecte computador e celular à mesma rede Wi-Fi. Consulte o IPv4 local do
+   computador com `ipconfig` (por exemplo, `192.168.1.10`).
+3. No PowerShell, configure e inicie:
+
+   ```powershell
+   $env:PORT = "8080"
+   $env:DATABASE_PATH = "data/demonstracao.sqlite"
+   $env:CARDAPIO_URL = "http://192.168.1.10:8080/cardapio.html"
+   npm run build
+   npm start
+   ```
+
+   Substitua o IP de exemplo pelo IP real. `localhost` no celular aponta para o
+   próprio celular, por isso não deve ser usado em `CARDAPIO_URL` nessa demonstração.
+   O servidor escuta nas interfaces de rede do computador.
+4. Confira `GET /api/categorias` e cadastre itens pelo formulário integrado ou pela
+   coleção do Postman, incluindo `valor: 0.29` e `valor: 0`. Consulte `/api/cardapio`.
+5. Abra a URL de `CARDAPIO_URL` no celular para confirmar acesso à página. No
+   computador, abra `http://192.168.1.10:8080/api/qrcode` e leia a imagem com a câmera
+   do celular: ela deve abrir exatamente a página pública configurada.
+6. Encerre e reinicie o servidor com o mesmo `DATABASE_PATH`; os itens permanecem.
+
+Se não houver acesso pelo celular, confira o IP, a conectividade entre dispositivos
+e a permissão de entrada do Node.js/porta no firewall da rede privada.
+**Não foi realizado teste em celular físico nem fluxo visual em navegador nesta
+entrega**, porque as telas não estão no checkout. Os testes HTTP usam um consumidor
+HTML temporário não versionado, removido após validar o destino do QR.
 
 ## Organização
 
@@ -181,22 +259,25 @@ src/
   errors/                ValidationError para dados inválidos
   models/                Categoria e ItemCardapio
   repositories/          Interfaces, repositories SQLite e leitura tipada das linhas
-  services/              Cadastro e consulta do cardápio/categorias
+  services/              Cadastro, consulta de cardápio/categorias e geração de QR
   controllers/           Adaptação HTTP e delegação aos services
-  routes/                Registro de POST itens e GET cardápio/categorias
+  routes/                Registro das quatro rotas da API
   dtos/                  Validação da entrada, conversão monetária e saída JSON
   middlewares/           Tratamento centralizado de erros 400/500
   patterns/
     strategy/            Interface e ordenações por nome ou valor
     singleton/           DatabaseConnectionManager
     builder/             ItemCardapioBuilder (construção e validação)
-    factory-method/      Futura criação dos geradores PNG e SVG
+    factory-method/      Interface, criador abstrato e criadores/geradores PNG e SVG
 public/                  Reservado para arquivos do frontend
 sql/schema.sql           Tabelas e categorias iniciais (inicialização idempotente)
-tests/                   Services com repositories falsos e integração SQLite/HTTP
+tests/                   Services, SQLite/HTTP, reinício e decodificação PNG/SVG
 data/                    Banco local, criado em execução e ignorado pelo Git
-docs/API.md              Contrato HTTP (três rotas disponíveis, QR planejado)
+docs/API.md              Contrato HTTP das quatro rotas disponíveis
 docs/FoodTruck.postman_collection.json  Exemplos importáveis no Postman
+docs/INTEGRACAO_FRONTEND.md             Telas ausentes e chamadas a integrar
+docs/VERIFICACAO.md                     Cenários executados e limites da entrega
+.env.example                           Exemplo de variáveis de ambiente
 ```
 
 Pastas reservadas são mantidas por `.gitkeep`, sem classes de preenchimento.
@@ -217,10 +298,13 @@ futuros arquivos do frontend em `public/`. A compilação considera somente `src
   ou fora dos inteiros seguros de JavaScript são rejeitados na gravação do preço.
 - A interface Strategy exige uma nova lista ordenada, preservando a lista de entrada.
   As implementações por nome e valor são injetadas no service de consulta.
-- Singleton, persistência SQLite, Builder, Strategy, services e as três primeiras
-  rotas HTTP estão implementados. Factory Method, QR Code e integração com frontend
-  ficam para etapas futuras.
+- Singleton, persistência SQLite, Builder, Strategy, Factory Method, services e as
+  quatro rotas HTTP estão implementados. A integração visual depende do recebimento
+  das telas externas; não há pedidos, pagamentos, login, edição, exclusão, busca ou filtros.
 
-Somente Express é necessário em execução nesta etapa. TypeScript, `tsx` e os tipos
-de Node.js/Express são ferramentas de desenvolvimento. O `package-lock.json`
-registra as versões instaladas para reprodução com `npm ci`.
+Express e `qrcode` são dependências de execução; SQLite vem do Node.js.
+TypeScript, `tsx`, declarações de tipos e os leitores de imagem/QR são dependências
+de desenvolvimento. A biblioteca de tipos de QR inclui APIs de canvas; `lib: DOM`
+é usado apenas para compatibilidade dessas declarações, mantendo `strict: true`.
+O `package-lock.json` registra as versões para reprodução com `npm ci`.
+Veja [o relatório de verificação](docs/VERIFICACAO.md) para os comandos e cenários executados.
