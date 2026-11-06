@@ -5,6 +5,7 @@ coverage/
 *.log
 
 # Bancos locais e arquivos auxiliares do SQLite.
+data/
 *.db
 *.db-*
 *.sqlite

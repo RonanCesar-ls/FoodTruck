@@ -1,8 +1,9 @@
 # Contrato planejado da API FoodTruck
 
 **Status: endpoints futuros, ainda não implementados.** Esta documentação permite
-ao frontend trabalhar com mocks. Na etapa 1, as quatro rotas abaixo retornam 404
-por não estarem registradas. Não há banco nem dados iniciais persistidos ainda.
+ao frontend trabalhar com mocks. Até a etapa 2, as quatro rotas abaixo retornam 404
+por não estarem registradas. A persistência SQLite e as categorias iniciais já são
+inicializadas pelo servidor, mas ainda não estão expostas por HTTP.
 
 O frontend consumirá HTTP/JSON na mesma origem do servidor. Exemplos locais usam
 `http://localhost:8080`; a porta pode ser alterada por `PORT`.
