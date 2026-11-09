@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Painel Administrativo</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <header class="topo"><img src="img/logo.png" alt=""><h1>Painel Administrativo</h1></header>
+  <main>
+    <section id="tela-form">
+      <h2 class="titulo">Cadastrar item</h2>
+      <form id="form" novalidate>
+        <label for="categoria">Categoria</label>
+        <select id="categoria" name="categoria" disabled><option value="">Carregando categorias...</option></select>
+        <button type="button" class="btn btn-borda btn-menor" id="recarregar-cat" hidden>Tentar novamente</button>
+
+        <label for="nome">Nome do item</label>
+        <input id="nome" name="nome" placeholder="Ex: Picanha Grelhada" maxlength="100">
+
+        <label for="descricao">Descrição (ingredientes)</label>
+        <input id="descricao" name="descricao" placeholder="Ex: Acompanhada de arroz, feijão e salada" maxlength="255">
+
+        <label for="valor">Valor (R$)</label>
+        <input id="valor" name="valor" inputmode="decimal" placeholder="Ex: 89,90">
+
+        <button type="submit" class="btn" id="enviar">Cadastrar item</button>
+      </form>
+
+      <section id="qr-area">
+        <h3>QR Code do cardápio</h3>
+        <p>Imprima e deixe à vista dos clientes.</p>
+        <p id="qr-status">Carregando QR Code...</p>
+        <img id="qr-img" alt="QR Code para abrir o cardápio" hidden>
+        <button type="button" class="btn btn-borda" id="qr-tentar" hidden>Tentar novamente</button>
+        <button type="button" class="btn btn-borda" id="imprimir" disabled>Imprimir QR Code</button>
+      </section>
+    </section>
+
+    <section id="tela-resultado" hidden>
+      <div id="msg" class="msg"></div>
+      <button type="button" class="btn" id="tentar" hidden>Tentar novamente</button>
+      <button type="button" class="btn btn-escuro" id="voltar">Voltar ao painel</button>
+    </section>
+  </main>
+  <script src="js/api.js"></script>
+  <script src="js/admin.js"></script>
+</body>
+</html>
