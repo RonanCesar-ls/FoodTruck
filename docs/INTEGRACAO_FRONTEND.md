@@ -1,76 +1,73 @@
-# Integração das telas externas
+# Integração do frontend existente
 
-## Situação do checkout
+As telas estão em `public/admin.html` e `public/cardapio.html`, com CSS, logo e
+JavaScript existentes preservados. O Express serve frontend e API na mesma origem;
+não há proxy nem CORS adicional. As quatro rotas, MVC, services, repositories e
+Singleton, Builder, Strategy e Factory Method continuam no fluxo real.
 
-Não há HTML, CSS, JavaScript de frontend, aplicação separada ou proxy no repositório.
-`public/` contém apenas `.gitkeep`. Nenhuma tela ou identidade visual foi substituída.
-O backend está pronto com as quatro rotas de [API.md](API.md).
-
-As telas que faltam receber e conectar são:
-
-| Tela | Chamadas necessárias | Estados a implementar/verificar quando os arquivos chegarem |
+| Página/recurso | Chamadas relativas | Comportamento |
 | --- | --- | --- |
-| Formulário de cadastro de item (arquivo não fornecido) | `GET /api/categorias` ao abrir; `POST /api/itens` ao enviar | Carregando categorias, enviando sem duplicar submissões, sucesso com item retornado, erro de validação/infraestrutura e opção de tentar novamente. |
-| Cardápio público (caminho local convencionado: `public/cardapio.html`, ainda ausente) | `GET /api/cardapio` | Carregamento, lista de itens, mensagem de cardápio vazio para `[]`, erro e nova tentativa. |
-| Exibição do QR Code (arquivo não fornecido; pode integrar uma tela existente) | `GET /api/qrcode` como imagem | Carregando imagem, imagem pronta, erro de carregamento e nova tentativa. |
+| `/admin.html` | GET /api/categorias; POST /api/itens | Categorias reais, validação e resultado do cadastro. |
+| QR no painel | GET /api/qrcode | PNG com carregamento, erro, nova consulta e botão de impressão. |
+| `/cardapio.html` | GET /api/cardapio | Grupos por categoria, preços em BRL, descrição null omitida. |
 
-Nenhum desses estados foi testado visualmente porque as telas estão fora do checkout.
-Não foi realizado teste em celular físico. Não é necessário adicionar pedidos,
-pagamentos, login, edição, exclusão, busca ou filtros.
+`js/api.js` compartilha chamadas e funções; `js/admin.js` coordena o painel;
+`js/cardapio.js` apresenta os itens. Textos usam textContent. Não foram adicionadas
+rotas ou telas ao escopo.
 
-## Mesma origem
+## Entrada e resultado do cadastro
 
-Preserve o visual e a estrutura das telas ao recebê-las. Seus arquivos podem ser
-servidos por `public/`, que o Express resolve independentemente do diretório de
-execução. Use URLs relativas `/api/...`, sem fixar `localhost` no JavaScript.
-Se a página pública tiver outro nome, altere `CARDAPIO_URL` para esse caminho.
+- Categoria é o nome retornado pela API, nunca ID ou objeto. Nome é obrigatório.
+- Descrição é opcional; vazia ou apenas com espaços vira null.
+- O campo de preço aceita 0, 0,29, 8,90 e 8.90. Valida dígitos e, opcionalmente,
+  um separador e uma ou duas casas antes de converter a escrita para número.
+- Vazio, negativo, expoente, hexadecimal, separadores repetidos e casas excedentes
+  são rejeitados antes do POST, com mensagem e campos preservados.
+- JSON envia valor numérico em reais. A API mantém a validação final e conversão
+  para centavos inteiros seguros. Não enviar valorCentavos.
 
-Se o frontend for entregue como aplicação separada em desenvolvimento, aproveite
-ou configure o proxy `/api` dessa aplicação para o backend. Não há proxy nem origem
-externa conhecida para configurar neste checkout. A API não habilita CORS aberto.
+Exemplo para preço digitado 0,29 e descrição vazia:
 
-## Cadastro
-
-1. Busque `/api/categorias` e preencha o seletor com os dados retornados. O valor
-   enviado em `categoria` é o **nome em texto** da opção, não seu objeto ou ID.
-2. Envie JSON com `Content-Type: application/json`. `valor` deve ser um número em
-   reais (zero é válido), nunca texto com vírgula; o backend realiza a conversão
-   para centavos. Não envie `valorCentavos` nem um ID escolhido pelo frontend.
-3. A descrição pode ser omitida ou `null`. No sucesso 201, use o objeto retornado,
-   com o ID gerado. Se a resposta não for de sucesso, exiba o texto de `erro`.
-
-```js
-const resposta = await fetch('/api/itens', {
-  method: 'POST',
-  headers: { 'Content-Type': 'application/json' },
-  body: JSON.stringify({ categoria: 'Bebidas', nome: 'Água', valor: 0.29 })
-});
-const resultado = await resposta.json();
-if (!resposta.ok) throw new Error(resultado.erro);
+```json
+{"categoria":"Bebidas","nome":"Água","descricao":null,"valor":0.29}
 ```
 
-## Cardápio público
+Enquanto o POST está pendente, a variável enviando e o botão desabilitado bloqueiam
+novas submissões. Um 201 com ID e nome válidos confirma o cadastro e limpa o formulário.
+Um 400 apresenta o erro da API e mantém os campos; Voltar ao formulário permite
+corrigir e fazer uma nova submissão intencional.
 
-Consuma `/api/cardapio`; a ordenação por nome já é aplicada pelo backend.
-Cada item contém `id`, `categoria` como texto, `nome`, `descricao` como texto/null
-e `valor` numérico em reais. Não renderize `null` como texto. A interface pode
-formatar valores com `Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' })`.
-Insira nome e descrição como texto, preservando os dados sem interpretá-los como HTML.
+Falha de conexão, perda/erro de leitura da resposta ou sucesso incompleto são
+resultados incertos. A tela avisa que o item pode ter sido gravado, preserva os
+campos e oferece Conferir cardápio em uma aba separada. Não existe botão que repita
+o último POST, cache de ultimoEnvio ou reenvio automático. Antes de iniciar um novo
+envio manual, confira a listagem. Isso não cria idempotência no servidor: um novo
+POST pode criar outra linha.
 
-## QR Code
+## Consultas, estados e QR
 
-Use, por exemplo, `<img src="/api/qrcode" alt="QR Code para abrir o cardápio">`.
-Essa chamada retorna PNG binário, não JSON. Trate os eventos de carregamento e erro
-da imagem. Não construa o destino a partir do `Host`: ele vem de `CARDAPIO_URL`
-configurada no servidor. Não há endpoint adicional para SVG.
+As novas tentativas de GET foram preservadas. Categorias mostram carregamento,
+erro e recuperação; o cardápio mostra Carregando, Cardápio vazio, lista agrupada e
+erro com Tentar novamente. Preços usam BRL; null não cria parágrafo de descrição.
 
-O padrão local é `/cardapio.html`. Quando a tela estiver pronta, confira que o
-endereço configurado abre essa tela e que ela consome `/api/cardapio`. Para o
-celular, use o IP do computador na mesma rede e siga a demonstração no README.
+O QR usa /api/qrcode como src da imagem e mantém erro/nova tentativa. O botão
+Imprimir QR Code chama window.print(); as regras @media print existentes foram
+preservadas. O destino vem de CARDAPIO_URL, com padrão local /cardapio.html.
+Para celular, use o IPv4 real do computador, a porta e esse caminho, conforme README.
 
-## Verificação já realizada
+## Verificação desta execução
 
-Os testes usam HTTP real e um consumidor HTML temporário com nome único em `public/`,
-fora dos arquivos versionados. Geram o PNG pela rota, decodificam o destino,
-consultam a página estática e o JSON do cardápio e depois removem o consumidor.
-Isso comprova contrato e destino; não substitui o fluxo visual nas telas externas.
+Os testes carregam HTML e scripts reais servidos pelo Express em jsdom, com fetch
+para o servidor compilado e SQLite temporário. Conferem 201/ID, zero, vírgula/ponto,
+categorias reais, BRL, descrição omitida, validação, estados/recuperação de GET,
+bloqueio de cliques, correção após 400 e persistência após reinício.
+
+A perda é simulada no fetch de teste somente depois de um POST real retornar 201
+e ser gravado: a tela fica incerta, não oferece reenvio e há exatamente uma linha.
+Também são cobertos corpo de resposta truncado e 201 incompleto. O teste de QR
+decodifica o PNG e abre /cardapio.html real, sem criar HTML temporário.
+
+jsdom não é navegador renderizado. Eventos de imagem e window.print são simulados;
+não se confirmam imagem visível, layout móvel, prévia ou impressão em papel.
+O serviço de navegador e o canal nativo estavam indisponíveis. Essas verificações
+e a câmera física permanecem pendentes, separadas em VERIFICACAO.md.

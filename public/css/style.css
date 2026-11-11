@@ -53,6 +53,7 @@ form .btn{margin-top:20px}
 #qr-status{margin-top:12px}
 .btn-menor{margin-top:8px;padding:8px}
 #tela-resultado .btn{margin-top:12px}
+#conferir-cardapio{text-align:center;text-decoration:none}
 
 @media print{
   body *{visibility:hidden}

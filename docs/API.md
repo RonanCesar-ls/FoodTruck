@@ -1,7 +1,7 @@
 # API FoodTruck
 
-**Status final do backend:** as quatro rotas abaixo estão disponíveis. As telas
-não estão neste checkout; veja [o guia de integração](INTEGRACAO_FRONTEND.md).
+As quatro rotas estão disponíveis e integradas às telas `/admin.html` e
+`/cardapio.html`, servidas pelo mesmo Express. Veja [o guia de integração](INTEGRACAO_FRONTEND.md).
 
 | Método e rota | Status |
 | --- | --- |
@@ -36,6 +36,11 @@ valores negativos são inválidos.**
 O valor não é arredondado para caber em centavos: `8.901` é rejeitado. Valores como
 `0.29`, `1.15` e `8.90` são aceitos e persistidos como 29, 115 e 890 centavos.
 O total em centavos não pode ultrapassar `Number.MAX_SAFE_INTEGER`.
+
+O formulário de `/admin.html` aceita vírgula ou ponto (`0`, `0,29`, `8,90`, `8.90`),
+valida a escrita decimal e envia um número no JSON. Isso não altera o contrato:
+`"valor":"8,90"` continua inválido para chamadas diretas à API. Descrição vazia no
+formulário é enviada como `null`; no cardápio, descrições nulas não são exibidas.
 
 ## POST /api/itens — disponível
 
@@ -115,6 +120,12 @@ JSON malformado retorna **HTTP 400**:
 O frontend deve apresentar o texto de `erro`, sem depender de uma mensagem literal
 específica. O nome do item e o nome da categoria têm os espaços externos removidos;
 o nome do item não pode ficar vazio. A descrição fornecida é preservada.
+
+O painel preserva os campos nos erros 400 para correção. Em falha de conexão ou
+perda de resposta após o POST, não é possível deduzir que a gravação falhou:
+o painel avisa que o item pode ter sido gravado e oferece consultar o cardápio.
+Não há reenvio automático nem botão de repetição do último POST. A API não oferece
+chave de idempotência: um novo envio manual é uma nova tentativa de cadastro.
 
 ## GET /api/cardapio — disponível
 
@@ -213,8 +224,9 @@ Não há envelope JSON, string base64 ou objeto com URL na resposta.
 O QR Code aponta para **`CARDAPIO_URL`**, a URL absoluta HTTP/HTTPS da página pública,
 validada na inicialização. O padrão é `http://localhost:<PORT>/cardapio.html`; o
 destino não é derivado do cabeçalho `Host` da requisição nem aponta para a rota JSON.
-Para o celular na mesma rede, configure, por exemplo,
-`CARDAPIO_URL=http://192.168.1.10:8080/cardapio.html`, substituindo o IP pelo do computador.
+Para o celular na mesma rede, configure
+`CARDAPIO_URL=http://<IPv4-real>:<PORT>/cardapio.html`, usando o IPv4 do computador
+exibido por `ipconfig` e a porta do servidor, conforme o passo a passo no README.
 O valor é normalizado por `URL` antes de ser codificado.
 
 O frontend pode referenciar `/api/qrcode` no `src` de uma imagem ou abrir essa rota
@@ -223,11 +235,12 @@ resposta como PNG. A imagem é criada pelo fluxo `QrCodeService` → `PngQrCodeC
 → método fábrica → `PngQrCodeGenerator`. O criador SVG está implementado e testado,
 mas não é exposto como outra rota ou parâmetro de formato.
 
-**A página pública ainda não está no checkout.** Quando for entregue, coloque-a em
-`public/cardapio.html` ou ajuste `CARDAPIO_URL` ao endereço real. Até isso acontecer,
-a API gera o PNG corretamente, mas o endereço padrão da página retorna 404.
-O destino foi validado por decodificação e por um consumidor HTML temporário, sem
-afirmar teste visual ou em celular físico. O passo a passo de rede está no README.
+`public/cardapio.html` está presente e é o destino público real do QR. O painel
+`/admin.html` exibe `/api/qrcode` como imagem e permite chamar a impressão.
+O teste decodifica o PNG, compara com `CARDAPIO_URL` e abre a página real, sem HTML
+temporário. O passo a passo PowerShell para informar o IPv4 real está no README.
+Navegador real, layout móvel, prévia/impressão e câmera física continuam pendentes
+nesta execução por indisponibilidade do navegador conectado e do dispositivo físico.
 
 ## Escopo
 

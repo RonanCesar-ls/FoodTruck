@@ -23,6 +23,17 @@ async function buscarCategorias() {
 }
 
 // dados = { categoria, nome, descricao, valor }
+class CadastroError extends Error {
+  constructor(message, resultadoIncerto = false) {
+    super(message);
+    this.resultadoIncerto = resultadoIncerto;
+  }
+}
+
+function cadastroIncerto() {
+  return new CadastroError("Não foi possível confirmar o cadastro. O item pode ter sido gravado. Confira o cardápio antes de iniciar um novo envio.", true);
+}
+
 async function cadastrarItem(dados) {
   if (USAR_MOCK) {
     if (dados.nome.toLowerCase() === "erro") throw new Error("Mensagem de erro de teste");
@@ -35,11 +46,22 @@ async function cadastrarItem(dados) {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(dados)
     });
-  } catch (e) {
-    throw new Error("Não foi possível conectar ao servidor.");
+  } catch {
+    throw cadastroIncerto();
   }
-  const json = await r.json().catch(() => ({}));
-  if (!r.ok) throw new Error(json.erro || "Erro ao cadastrar");
+  let json;
+  try {
+    json = await r.json();
+  } catch {
+    if (r.status === 400) throw new CadastroError("O cadastro foi rejeitado. Revise os campos.");
+    throw cadastroIncerto();
+  }
+  if (r.status === 400) throw new CadastroError(json?.erro || "O cadastro foi rejeitado. Revise os campos.");
+  // Uma falha após o envio, inclusive uma resposta de sucesso incompleta,
+  // não comprova que o banco deixou de gravar. Nunca repetir o POST aqui.
+  if (r.status !== 201 || !json || !Number.isSafeInteger(json.id) || json.id <= 0 || typeof json.nome !== "string") {
+    throw cadastroIncerto();
+  }
   return json;
 }
 

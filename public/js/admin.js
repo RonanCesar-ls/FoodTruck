@@ -6,8 +6,7 @@ const telaForm = document.getElementById("tela-form");
 const telaResultado = document.getElementById("tela-resultado");
 const msg = document.getElementById("msg");
 const botao = document.getElementById("enviar");
-const btnTentar = document.getElementById("tentar");
-let ultimoEnvio = null; // dados do último envio, para "Tentar novamente"
+const conferirCardapio = document.getElementById("conferir-cardapio");
 let enviando = false;
 
 // ---- Categorias ----
@@ -33,10 +32,11 @@ async function carregarCategorias() {
 btnRecarregarCat.addEventListener("click", carregarCategorias);
 
 // ---- Cadastro ----
-function mostrarResultado(tipo, titulo, texto, podeTentar) {
+function mostrarResultado(tipo, titulo, texto, resultadoIncerto = false) {
   msg.className = "msg " + tipo;
   msg.replaceChildren(el("h3", "", titulo), el("p", "", texto));
-  btnTentar.hidden = !podeTentar;
+  conferirCardapio.hidden = !resultadoIncerto;
+  document.getElementById("voltar").textContent = tipo === "sucesso" ? "Voltar ao painel" : "Voltar ao formulário";
   telaForm.hidden = true;
   telaResultado.hidden = false;
 }
@@ -48,40 +48,43 @@ async function enviar(dados) {
   try {
     const salvo = await cadastrarItem(dados);
     form.reset();
-    ultimoEnvio = null;
     mostrarResultado("sucesso", "Item cadastrado", `"${salvo.nome}" já aparece no cardápio.`, false);
   } catch (e) {
-    ultimoEnvio = dados;
-    mostrarResultado("erro", "Erro no cadastro", e.message, true);
+    mostrarResultado("erro", e.resultadoIncerto ? "Cadastro não confirmado" : "Erro no cadastro", e.message, e.resultadoIncerto);
   } finally {
     enviando = false;
     botao.disabled = false;
   }
 }
 
-// "89,90" -> 89.9 ; vazio ou texto inválido -> NaN
+// Valida a escrita decimal antes de Number(), que também aceitaria expoente e hexadecimal.
 function lerValor(texto) {
-  const t = texto.trim().replace(",", ".");
-  return t === "" ? NaN : Number(t);
+  const t = texto.trim();
+  if (!/^\d+(?:[,.]\d{1,2})?$/.test(t)) return NaN;
+  const valor = Number(t.replace(",", "."));
+  return Number.isFinite(valor) ? valor : NaN;
 }
 
 form.addEventListener("submit", (ev) => {
   ev.preventDefault();
+  if (enviando) return;
   const dados = {
     categoria: selectCategoria.value,
-    nome: form.nome.value.trim(),
-    descricao: form.descricao.value.trim(),
-    valor: lerValor(form.valor.value)
+    nome: form.elements.namedItem("nome").value.trim(),
+    descricao: form.elements.namedItem("descricao").value.trim() || null,
+    valor: lerValor(form.elements.namedItem("valor").value)
   };
-  if (!dados.categoria || !dados.nome || !dados.descricao || !Number.isFinite(dados.valor)) {
-    ultimoEnvio = null;
-    mostrarResultado("erro", "Erro no cadastro", "Preencha todos os campos. O valor deve ser um número, como 89,90.", false);
+  if (!dados.categoria || !dados.nome) {
+    mostrarResultado("erro", "Erro no cadastro", "Selecione uma categoria e preencha o nome do item. A descrição é opcional.");
+    return;
+  }
+  if (!Number.isFinite(dados.valor)) {
+    mostrarResultado("erro", "Erro no cadastro", "Informe um valor maior ou igual a zero, como 0, 0,29 ou 8.90, com no máximo duas casas decimais. Não use expoente ou hexadecimal.");
     return;
   }
   enviar(dados);
 });
 
-btnTentar.addEventListener("click", () => { if (ultimoEnvio) enviar(ultimoEnvio); });
 document.getElementById("voltar").addEventListener("click", () => {
   telaResultado.hidden = true;
   telaForm.hidden = false;

@@ -3,9 +3,11 @@
 Sistema acadêmico de cardápio via QR Code. Backend concluído, com quatro rotas:
 estrutura inicial, models, persistência SQLite, Singleton, repositories síncronos,
 Builder, estratégias de ordenação, Factory Method, services, controllers e [API HTTP](docs/API.md).
-Cadastro, cardápio, categorias e QR Code PNG estão disponíveis. **As telas ainda
-não foram fornecidas:** `public/` contém apenas `.gitkeep`. A integração externa
-está descrita em [docs/INTEGRACAO_FRONTEND.md](docs/INTEGRACAO_FRONTEND.md).
+Cadastro, cardápio, categorias e QR Code PNG estão disponíveis. As telas existentes
+estão integradas na mesma origem: [painel](http://localhost:8080/admin.html) e
+[cardápio público](http://localhost:8080/cardapio.html). A identidade visual, os
+arquivos HTML/CSS/JavaScript e as chamadas relativas foram preservados. Veja
+[o guia da integração](docs/INTEGRACAO_FRONTEND.md).
 
 ## Pré-requisitos
 
@@ -31,7 +33,7 @@ npm run dev
 | `npm run dev` | Executa TypeScript com `tsx watch`, reiniciando após alterações. |
 | `npm run typecheck` | Verifica os tipos sem gerar arquivos. |
 | `npm run build` | Compila `src/` para `dist/` usando `tsc`. |
-| `npm test` | Compila e testa services, padrões, SQLite/HTTP, reinício do servidor e decodificação de QR PNG/SVG. |
+| `npm test` | Compila e testa services, padrões, SQLite/HTTP, reinício, QR PNG/SVG e scripts reais das telas em jsdom. |
 | `npm start` | Executa `dist/server.js`; requer build prévio. |
 
 Para executar o build:
@@ -64,8 +66,8 @@ Encerre o servidor com `Ctrl+C`.
 O destino do QR é a URL configurada, normalizada por `URL`, nunca o cabeçalho
 `Host` recebido. Se `PORT` mudar e `CARDAPIO_URL` estiver ausente, o padrão acompanha
 a nova porta. Ao definir `CARDAPIO_URL` explicitamente, mantenha a porta e o caminho
-coerentes com a página real. **A página `public/cardapio.html` ainda deve ser entregue
-pelo frontend; o QR não cria uma tela e o destino padrão retornará 404 até lá.**
+coerentes com a página real. A página `public/cardapio.html` já é servida pelo Express;
+o destino local padrão do QR abre essa tela.
 
 [.env.example](.env.example) contém um exemplo. Para usar um arquivo de ambiente
 com o suporte nativo do Node.js, sem instalar `dotenv`:
@@ -86,10 +88,28 @@ estáticos e tratamento de erros sem abrir porta nem inicializar o banco.
 `OrdenacaoPorNome` e o criador PNG antes de criar a aplicação e iniciar a escuta. Uma falha no banco
 impede a abertura da porta. O caminho de `public/` é resolvido a partir da
 localização do módulo, funcionando em desenvolvimento e no build mesmo se o
-processo for iniciado em outro diretório. `public/` ainda não contém frontend.
+processo for iniciado em outro diretório. `public/` contém o frontend integrado.
 
 `GET /api/cardapio` retorna **200**, com `[]` quando não há itens.
 `GET /api/qrcode` retorna **200**, com bytes PNG e `Content-Type: image/png`.
+
+### Telas e comportamento do cadastro
+
+- `http://localhost:8080/admin.html`: formulário, categorias reais, QR e botão de impressão.
+- `http://localhost:8080/cardapio.html`: itens agrupados por categoria, preços em BRL,
+  descrição ausente omitida e estados de carregamento, vazio e erro com nova consulta.
+
+A descrição é opcional. O formulário aceita `0`, `0,29`, `8,90` e `8.90` e envia
+`valor` como número em reais, nunca como string. Rejeita campo vazio, negativos,
+expoentes, hexadecimal e mais de duas casas antes do POST. A API mantém a validação
+final e a conversão para centavos. A categoria enviada é o nome retornado pela API.
+
+Durante o envio, cliques repetidos ficam bloqueados. Erros preservam os campos:
+um 400 apresenta o texto `erro` da API e permite voltar ao formulário para corrigir.
+Se a conexão/resposta falhar ou o sucesso vier incompleto, a tela avisa que o item
+pode ter sido gravado e oferece **Conferir cardápio**. Não guarda nem reenvia o
+último POST; confira a listagem antes de iniciar um novo envio manual. As novas
+tentativas de categorias, cardápio e QR continuam disponíveis para suas consultas.
 
 ## API HTTP e Postman
 
@@ -215,39 +235,44 @@ recebe o criador e `CARDAPIO_URL`; o controller retorna a imagem. SVG é uma op�
 interna de criação, sem uma quinta rota nem parâmetro de formato no HTTP.
 `sharp` e `jsqr` são dependências somente de teste: rasterizam as duas imagens e
 decodificam o conteúdo com um leitor independente.
+`jsdom` executa os scripts reais das páginas nos testes com HTTP e SQLite reais;
+não comprova renderização, layout responsivo nem impressão em um navegador.
 
 ## Demonstração na mesma rede pelo celular
 
-1. Receba as telas da outra pessoa e coloque a página pública em
-   `public/cardapio.html`, ou ajuste `CARDAPIO_URL` ao endereço real do frontend.
-   Conecte as três telas conforme [o guia de integração](docs/INTEGRACAO_FRONTEND.md).
-2. Conecte computador e celular à mesma rede Wi-Fi. Consulte o IPv4 local do
-   computador com `ipconfig` (por exemplo, `192.168.1.10`).
-3. No PowerShell, configure e inicie:
+1. Conecte computador e celular à mesma rede Wi-Fi. No PowerShell, execute
+   `ipconfig` e identifique o **IPv4 real** do adaptador Wi-Fi/Ethernet conectado.
+2. Na raiz do repositório, informe esse IPv4 e inicie:
 
    ```powershell
+   $ipv4 = Read-Host "Digite o IPv4 real do computador mostrado pelo ipconfig"
    $env:PORT = "8080"
    $env:DATABASE_PATH = "data/demonstracao.sqlite"
-   $env:CARDAPIO_URL = "http://192.168.1.10:8080/cardapio.html"
+   $env:CARDAPIO_URL = "http://${ipv4}:$($env:PORT)/cardapio.html"
    npm run build
    npm start
    ```
 
-   Substitua o IP de exemplo pelo IP real. `localhost` no celular aponta para o
+   Use o IPv4 real, sem reaproveitar um IP ilustrativo da documentação. `localhost` no celular aponta para o
    próprio celular, por isso não deve ser usado em `CARDAPIO_URL` nessa demonstração.
    O servidor escuta nas interfaces de rede do computador.
-4. Confira `GET /api/categorias` e cadastre itens pelo formulário integrado ou pela
-   coleção do Postman, incluindo `valor: 0.29` e `valor: 0`. Consulte `/api/cardapio`.
-5. Abra a URL de `CARDAPIO_URL` no celular para confirmar acesso à página. No
-   computador, abra `http://192.168.1.10:8080/api/qrcode` e leia a imagem com a câmera
-   do celular: ela deve abrir exatamente a página pública configurada.
-6. Encerre e reinicie o servidor com o mesmo `DATABASE_PATH`; os itens permanecem.
+3. No computador, abra `http://<IPv4-real>:8080/admin.html`. Confirme as categorias
+   e cadastre um item com valor `0` e descrição vazia e outro com `0,29`.
+4. Abra `http://<IPv4-real>:8080/cardapio.html` e confira grupos, `R$ 0,00`,
+   `R$ 0,29` e ausência de uma descrição `null` na tela.
+5. Abra a URL de `CARDAPIO_URL` no celular para confirmar acesso. No painel,
+   confira o QR e abra a prévia pelo botão **Imprimir QR Code**. Leia o QR com a
+   câmera física do celular: deve abrir exatamente `/cardapio.html` no IP configurado.
+6. Confira também o painel e o cardápio em uma largura de celular no navegador.
+7. Encerre com `Ctrl+C` e reinicie com `npm start`, mantendo as variáveis e o mesmo
+   SQLite nessa janela do PowerShell. Os itens devem permanecer sem duplicar categorias.
 
 Se não houver acesso pelo celular, confira o IP, a conectividade entre dispositivos
 e a permissão de entrada do Node.js/porta no firewall da rede privada.
-**Não foi realizado teste em celular físico nem fluxo visual em navegador nesta
-entrega**, porque as telas não estão no checkout. Os testes HTTP usam um consumidor
-HTML temporário não versionado, removido após validar o destino do QR.
+**Pendente nesta execução:** navegador real, layout em largura de celular, prévia/
+impressão e câmera física. O serviço de acesso ao navegador e o canal nativo de
+controle do computador estavam indisponíveis. Os testes de DOM cobrem as interações
+e a chamada de `window.print()`; o teste de QR agora usa `/cardapio.html` real.
 
 ## Organização
 
@@ -269,18 +294,22 @@ src/
     singleton/           DatabaseConnectionManager
     builder/             ItemCardapioBuilder (construção e validação)
     factory-method/      Interface, criador abstrato e criadores/geradores PNG e SVG
-public/                  Reservado para arquivos do frontend
+public/admin.html        Painel de cadastro e QR Code
+public/cardapio.html     Cardápio público
+public/js/               API compartilhada, painel e agrupamento do cardápio
+public/css/style.css     Identidade visual e regras de impressão preservadas
+public/img/logo.png      Logo existente
 sql/schema.sql           Tabelas e categorias iniciais (inicialização idempotente)
-tests/                   Services, SQLite/HTTP, reinício e decodificação PNG/SVG
+tests/                   Services, SQLite/HTTP, DOM das telas, reinício e QR PNG/SVG
 data/                    Banco local, criado em execução e ignorado pelo Git
 docs/API.md              Contrato HTTP das quatro rotas disponíveis
 docs/FoodTruck.postman_collection.json  Exemplos importáveis no Postman
-docs/INTEGRACAO_FRONTEND.md             Telas ausentes e chamadas a integrar
+docs/INTEGRACAO_FRONTEND.md             Telas integradas e política de envio/recuperação
 docs/VERIFICACAO.md                     Cenários executados e limites da entrega
 .env.example                           Exemplo de variáveis de ambiente
 ```
 
-Pastas reservadas são mantidas por `.gitkeep`, sem classes de preenchimento.
+Não há classes vazias para preencher a estrutura.
 Os arquivos vazios e sem referências de `Controller/`, `Model/` e `View/` foram
 removidos. Models ficam em `src/models/`, controllers em `src/controllers/` e os
 futuros arquivos do frontend em `public/`. A compilação considera somente `src/`.
@@ -298,9 +327,10 @@ futuros arquivos do frontend em `public/`. A compilação considera somente `src
   ou fora dos inteiros seguros de JavaScript são rejeitados na gravação do preço.
 - A interface Strategy exige uma nova lista ordenada, preservando a lista de entrada.
   As implementações por nome e valor são injetadas no service de consulta.
-- Singleton, persistência SQLite, Builder, Strategy, Factory Method, services e as
-  quatro rotas HTTP estão implementados. A integração visual depende do recebimento
-  das telas externas; não há pedidos, pagamentos, login, edição, exclusão, busca ou filtros.
+- Singleton, persistência SQLite, Builder, Strategy, Factory Method, services, as
+  quatro rotas HTTP e as duas telas estão integrados. Não há pedidos, pagamentos,
+  login, edição, exclusão, busca ou filtros. A validação visual depende da
+  disponibilidade de navegador; a leitura por câmera depende de celular físico.
 
 Express e `qrcode` são dependências de execução; SQLite vem do Node.js.
 TypeScript, `tsx`, declarações de tipos e os leitores de imagem/QR são dependências

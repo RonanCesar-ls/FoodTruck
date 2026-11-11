@@ -1,51 +1,59 @@
-# Verificação do backend — 6 de novembro de 2026
+# Verificação da integração — 11 de novembro de 2026
 
-Ambiente executado: Node.js 24.12.0, npm e Windows. O checkout não contém telas;
-os testes não usam dados reais nem o banco padrão. Arquivos SQLite e o consumidor
-HTML temporário são removidos ao terminar, e os servidores de teste são encerrados.
+Ambiente: Windows, Node.js 24.12.0 e npm. Git inicialmente limpo na main.
+As duas telas e seus scripts, CSS e logo já estavam presentes. Foram preservados
+visual, chamadas relativas, quatro rotas e os quatro padrões GoF. Nenhum banco
+real foi utilizado: processos e arquivos SQLite temporários são encerrados/removidos.
 
 ## Comandos executados
 
-- `npm install --save-exact qrcode`
-- `npm install --save-dev --save-exact @types/qrcode jsqr sharp`
-- `npm run typecheck`
-- `npm test`, que executa `npm run build` antes dos testes Node.js.
-- Leitura de `.env.example` com `node --env-file=.env.example --input-type=module`,
-  confirmando porta, caminho e URL padrão sem abrir banco ou porta.
-- Validação JSON dos 14 exemplos da coleção do Postman e `git diff --check`.
+- `npm install --save-dev --save-exact jsdom` (somente teste).
+- `npm run typecheck`.
+- `npm run build`.
+- `npm test` (também recompila antes do runner do Node.js).
 
-Resultado: **24 testes passaram, nenhuma falha**. A instalação informou zero
-vulnerabilidades. A verificação de tipos mantém `strict: true`; nenhum erro foi
-ignorado. O aviso experimental de `node:sqlite` emitido por esta versão do Node.js
-não impediu a execução.
+Resultado: **33 testes passaram, nenhuma falha**. A instalação informou zero
+vulnerabilidades. TypeScript mantém strict: true. O aviso experimental de
+node:sqlite no Node.js 24.12.0 não impediu os testes.
 
-## Cenários executados
+## Cenários verificados
 
 | Cenário | Evidência |
 | --- | --- |
-| SQLite real e Singleton | Conexão compartilhada, foreign keys habilitadas, nomes de categorias únicos, restrições de preço e ausência de descrição preservada. |
-| Categorias e cardápio inicial | HTTP 200 com Bebidas, Pratos e Sobremesas e `[]` antes dos cadastros. |
-| Cadastro válido | HTTP 201, IDs gerados, `0.29` persistido como 29 centavos, zero aceito e descrição omitida/null/texto. |
-| Builder e erros de validação | Categoria/nome/valor obrigatórios, nome aparado, centavos inteiros seguros, sem gravar entradas inválidas. |
-| Strategy | Nome em português e valor crescente produzem ordens diferentes, sem alterar a entrada; empates preservados. |
-| Contrato de erro | HTTP 400 com `{erro}` para categoria inexistente, nome em branco, negativo, string monetária, precisão excedente, tipos incorretos e JSON malformado; total de itens inalterado. |
-| Falha de infraestrutura | Falhas SQL reais no banco temporário e falha assíncrona de geração do QR retornam HTTP 500 genérico. |
-| Reinício real | Processo do servidor compilado encerrado e iniciado novamente com o mesmo arquivo: IDs, itens, valores, descrições e categorias preservados, sem duplicatas. |
-| QR PNG HTTP | HTTP 200, `image/png`, assinatura PNG, imagem rasterizada e decodificada com leitor independente; destino igual a `CARDAPIO_URL`, mesmo com `Host` diferente. |
-| Criador SVG | Operação comum do criador SVG gera imagem SVG; rasterização e decodificação recuperam o mesmo destino do criador PNG. |
-| Configuração | URL HTTP/HTTPS aceita; URLs relativas, vazias, inválidas e outros protocolos rejeitados antes de abrir o banco/porta. Padrão usa a porta configurada. |
-| Consumidor temporário | URL decodificada abre um arquivo HTML público temporário e o consumidor acessa o contrato JSON. Nenhum frontend definitivo foi criado. |
-| Separação da aplicação | Importar `app.ts` não abre banco nem porta; caminhos funcionam em `src/` e `dist/` e fora da raiz do projeto. |
+| Telas reais | HTTP 200 em /admin.html e /cardapio.html; scripts servidos pelo Express executados em jsdom. |
+| Categorias | Três categorias do SQLite; select usa nomes. Carregamento, falha de consulta e recuperação no DOM. |
+| Cadastro | 201/ID para 0, 0,29, 8,90 e 8.90; JSON numérico, descrição vazia null. |
+| Cardápio | Agrupamento por categoria, BRL (R$ 0,00 e R$ 0,29) e nenhum parágrafo de descrição null. |
+| Validação local | Vazio, negativo, expoente, hexadecimal, casas excedentes e separadores repetidos rejeitados sem POST; campos preservados. |
+| Correção após 400 | Erro real da API exibido; sem gravar; campos preservados, correção e novo cadastro bem-sucedido. |
+| Cliques repetidos | Duas submissões durante POST pendente geram uma chamada e uma linha. |
+| Resposta perdida | POST real retorna 201 e grava antes da falha simulada no fetch; aviso de incerteza, link de consulta, nenhum reenvio direto e uma linha. |
+| Resposta truncada/incompleta | Falha ao ler JSON e 201 sem ID não apagam campos nem confirmam sucesso. |
+| Estados de consulta | Carregamento, vazio, erro e recuperação de GET; estratégias por nome/valor testadas sem mutar a lista. |
+| Persistência | Servidor compilado reiniciado com mesmo SQLite; itens, IDs e categorias preservados sem duplicação. |
+| QR PNG/SVG | PNG 200 image/png; ambos os criadores produzem imagens decodificáveis para o mesmo destino. |
+| Destino real | URL decodificada igual a CARDAPIO_URL, independente do Host; abre /cardapio.html real e seu script. Não há HTML temporário no teste. |
+| Erros da API | 400 com {erro} sem inserir; falhas SQL e de QR retornam 500 genérico. |
+| Comando de impressão | Evento load simulado habilita botão e clique invoca window.print uma vez, em stub de teste. |
+| Configuração/MVC | URL validada antes de banco/porta; importar app não abre banco; caminhos src/dist independem da raiz de execução. |
 
-## Limites e pendências externas
+A simulação de perda de resposta altera somente o fetch do DOM de teste; não há
+endpoints de teste nem falhas introduzidas na aplicação. QR é rasterizado por
+sharp e decodificado por jsqr, independentemente do encoder qrcode.
 
-- Não houve teste visual em navegador: faltam os arquivos do formulário, cardápio
-  público e exibição do QR. As chamadas e estados necessários constam no guia de integração.
-- **Não houve teste em celular físico** nem confirmação da rede Wi-Fi do usuário.
-  O passo a passo para essa demonstração está no README.
-- `public/cardapio.html` ainda não existe. O QR padrão aponta para esse caminho
-  convencionado; a tela deverá ser entregue ali ou `CARDAPIO_URL` deverá apontar
-  para o endereço verdadeiro da página pública.
-- A coleção do Postman contém exemplos importáveis. A validação HTTP automatizada
-  foi executada pelo runner do Node.js; não se afirma execução da interface do Postman.
-- Não foram realizados commit, push ou deploy.
+## Verificações pendentes
+
+O controle do computador retornou serviço de acesso ao navegador indisponível e
+canal nativo desconectado. Nenhum navegador controlável foi disponibilizado.
+jsdom não calcula layout real nem comprova a renderização. Permanecem pendentes:
+
+- Fluxo visual nas duas páginas em navegador real e exibição efetiva do QR.
+- Layout em largura de celular (por exemplo, 390 px), incluindo transbordamentos.
+- Prévia de impressão e impressão em papel; somente a invocação foi testada.
+- Leitura do QR por câmera física e conectividade da rede Wi-Fi do usuário.
+
+O README apresenta a demonstração no PowerShell: informar o IPv4 real mostrado
+por ipconfig e configurar CARDAPIO_URL com esse IP, porta e /cardapio.html.
+Não usar localhost ou um IP ilustrativo ao testar no celular.
+
+Nenhum commit, push ou deploy foi realizado. Os servidores de teste foram encerrados.

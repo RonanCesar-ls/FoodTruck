@@ -1,8 +1,7 @@
 import assert from "node:assert/strict";
 import { spawn, spawnSync } from "node:child_process";
-import { randomUUID } from "node:crypto";
 import { once } from "node:events";
-import { existsSync, mkdtempSync, rmSync, unlinkSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, rmSync } from "node:fs";
 import net from "node:net";
 import { tmpdir } from "node:os";
 import { basename, dirname, join, resolve } from "node:path";
@@ -114,19 +113,9 @@ async function startServer(port, databasePath, cardapioUrl) {
   return { baseUrl: `http://127.0.0.1:${port}`, stop };
 }
 
-test("servidor preserva dados após reiniciar e QR abre um consumidor público temporário", async (t) => {
+test("servidor preserva dados após reiniciar e QR abre cardapio.html real", async (t) => {
   const port = await freePort();
-  const pageName = `foodtruck-consumidor-${randomUUID()}.html`;
-  const pagePath = fileURLToPath(new URL(`../public/${pageName}`, import.meta.url));
-  // O frontend está fora deste checkout. Este consumidor não é versionado e é
-  // removido ao terminar; não substitui as telas que serão entregues por outra pessoa.
-  writeFileSync(pagePath, `<!doctype html><meta charset="utf-8"><title>Consumidor temporário</title>
-<main id="cardapio">Carregando...</main><script type="module">
-const response = await fetch('/api/cardapio');
-document.querySelector('#cardapio').textContent = JSON.stringify(await response.json());
-</script>`, { flag: "wx" });
-  t.after(() => unlinkSync(pagePath));
-  const destination = `http://127.0.0.1:${port}/${pageName}`;
+  const destination = `http://127.0.0.1:${port}/cardapio.html`;
   const databasePath = join(temporaryRoot, "reinicio.sqlite");
   let server = await startServer(port, databasePath, destination);
   t.after(async () => { await server.stop(); });
@@ -170,8 +159,12 @@ document.querySelector('#cardapio').textContent = JSON.stringify(await response.
   const page = await fetch(decodedUrl);
   assert.equal(page.status, 200);
   assert.match(page.headers.get("content-type"), /^text\/html/);
-  assert.match(await page.text(), /Consumidor temporário/);
-  // Chamadas do consumidor ao contrato real; não se afirma teste de UI ou celular.
+  const html = await page.text();
+  assert.match(html, /<title>Cardápio<\/title>/);
+  assert.match(html, /js\/cardapio\.js/);
+  const script = await fetch(server.baseUrl + "/js/cardapio.js");
+  assert.equal(script.status, 200);
+  assert.match(await script.text(), /buscarCardapio/);
   assert.deepEqual(await getJson("/api/cardapio"), expected);
 });
 

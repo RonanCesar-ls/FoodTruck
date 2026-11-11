@@ -1,7 +1,7 @@
 {
   "info": {
     "name": "FoodTruck — API completa",
-    "description": "Inicie o servidor e ajuste baseUrl. Em um SQLite novo, o primeiro cardápio estará vazio. Os três cadastros retornam 201; os casos inválidos retornam 400 com {erro} e não inserem itens. Os IDs não são fixos. GET /api/qrcode retorna PNG binário com CARDAPIO_URL; a página pública precisa ser fornecida pelo frontend.",
+    "description": "Inicie o servidor e ajuste baseUrl. Em um SQLite novo, o primeiro cardápio estará vazio. Os três cadastros retornam 201; os casos inválidos retornam 400 com {erro} e não inserem itens. Os IDs não são fixos. GET /api/qrcode retorna PNG binário com CARDAPIO_URL, cujo destino local é /cardapio.html. As telas estão em /admin.html e /cardapio.html.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
